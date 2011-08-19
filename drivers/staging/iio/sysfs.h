@@ -128,9 +128,10 @@ enum iio_event_direction {
 	IIO_EV_DIR_FALLING,
 };
 
-#define IIO_EVENT_CODE(chan_type, modifier, direction,			\
+#define IIO_EVENT_CODE(chan_type, diff, modifier, direction,		\
 		       type, chan, chan1, chan2)			\
-	(((u64)type << 56) | ((u64)direction << 48) | ((u64)modifier << 40) | \
+	(((u64)type << 56) | ((u64)diff << 48) |			\
+	 ((u64)direction << 47) | ((u64)modifier << 40) |		\
 	 ((u64)chan_type << 32) | (chan2 << 16) | chan1 | chan)
 
 #define IIO_EV_DIR_MAX 4
@@ -139,10 +140,10 @@ enum iio_event_direction {
 
 #define IIO_MOD_EVENT_CODE(channelclass, number, modifier,		\
 			   type, direction)				\
-	IIO_EVENT_CODE(channelclass, modifier, direction, type, number, 0, 0)
+	IIO_EVENT_CODE(channelclass, 0, modifier, direction, type, number, 0, 0)
 
 #define IIO_UNMOD_EVENT_CODE(channelclass, number, type, direction)	\
-	IIO_EVENT_CODE(channelclass, 0, direction, type, number, 0, 0)
+	IIO_EVENT_CODE(channelclass, 0, 0, direction, type, number, 0, 0)
 
 #define IIO_EVENT_CODE_EXTRACT_TYPE(mask) ((mask >> 56) & 0xFF)
 #define IIO_EVENT_CODE_EXTRACT_DIR(mask) ((mask >> 48) & 0xFF)
