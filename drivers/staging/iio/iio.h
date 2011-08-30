@@ -194,7 +194,7 @@ static inline s64 iio_get_time_ns(void)
 	(INDIO_BUFFER_TRIGGERED | INDIO_BUFFER_HARDWARE)
 
 /* Vast majority of this is set by the industrialio subsystem on a
- * call to iio_device_register. */
+ * call to iio_st_device_register. */
 #define IIO_VAL_INT 1
 #define IIO_VAL_INT_PLUS_MICRO 2
 #define IIO_VAL_INT_PLUS_NANO 3
@@ -324,16 +324,16 @@ struct iio_dev {
 };
 
 /**
- * iio_device_register() - register a device with the IIO subsystem
+ * iio_st_device_register() - register a device with the IIO subsystem
  * @dev_info:		Device structure filled by the device driver
  **/
-int iio_device_register(struct iio_dev *dev_info);
+int iio_st_device_register(struct iio_dev *dev_info);
 
 /**
- * iio_device_unregister() - unregister a device from the IIO subsystem
+ * iio_st_device_unregister() - unregister a device from the IIO subsystem
  * @dev_info:		Device structure representing the device.
  **/
-void iio_device_unregister(struct iio_dev *dev_info);
+void iio_st_device_unregister(struct iio_dev *dev_info);
 
 /**
  * iio_push_event() - try to add event to the list for userspace reading

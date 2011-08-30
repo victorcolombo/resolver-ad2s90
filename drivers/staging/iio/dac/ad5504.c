@@ -325,7 +325,7 @@ static int __devinit ad5504_probe(struct spi_device *spi)
 			goto error_disable_reg;
 	}
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_free_irq;
 
@@ -358,7 +358,7 @@ static int __devexit ad5504_remove(struct spi_device *spi)
 		regulator_put(st->reg);
 	}
 
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

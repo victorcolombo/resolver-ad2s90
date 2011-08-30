@@ -769,7 +769,7 @@ static int __devinit tsl2563_probe(struct i2c_client *client,
 	/* The interrupt cannot yet be enabled so this is fine without lock */
 	schedule_delayed_work(&chip->poweroff_work, 5 * HZ);
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto fail3;
 
@@ -798,7 +798,7 @@ static int tsl2563_remove(struct i2c_client *client)
 	tsl2563_set_power(chip, 0);
 	if (client->irq)
 		free_irq(client->irq, indio_dev);
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

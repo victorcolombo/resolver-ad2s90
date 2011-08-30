@@ -1318,7 +1318,7 @@ static int __devinit max1363_probe(struct i2c_client *client,
 			goto error_uninit_ring;
 	}
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret < 0)
 		goto error_free_irq;
 
@@ -1356,7 +1356,7 @@ static int max1363_remove(struct i2c_client *client)
 		regulator_disable(reg);
 		regulator_put(reg);
 	}
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

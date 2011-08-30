@@ -220,7 +220,7 @@ static int __devinit ad7314_probe(struct spi_device *spi_dev)
 	indio_dev->dev.parent = &spi_dev->dev;
 	indio_dev->info = &ad7314_info;
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_free_dev;
 
@@ -239,7 +239,7 @@ static int __devexit ad7314_remove(struct spi_device *spi_dev)
 	struct iio_dev *indio_dev = dev_get_drvdata(&spi_dev->dev);
 
 	dev_set_drvdata(&spi_dev->dev, NULL);
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

@@ -439,7 +439,7 @@ static int __devinit iio_dummy_probe(int index)
 	if (ret < 0)
 		goto error_unconfigure_buffer;
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret < 0)
 		goto error_unregister_buffer;
 
@@ -485,7 +485,7 @@ static int iio_dummy_remove(int index)
 	if (ret)
 		goto error_ret;
 	/* Unregister the device and free all structures */
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 error_ret:
 	return ret;

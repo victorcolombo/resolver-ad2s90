@@ -87,7 +87,7 @@ static int __devinit ad2s90_probe(struct spi_device *spi)
 	indio_dev->info = &ad2s90_info;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 
-	ret = iio_device_register(st->idev);
+	ret = iio_st_device_register(st->idev);
 	if (ret)
 		goto error_free_dev;
 
@@ -106,7 +106,7 @@ error_ret:
 
 static int __devexit ad2s90_remove(struct spi_device *spi)
 {
-	iio_device_unregister(spi_get_drvdata(spi));
+	iio_st_device_unregister(spi_get_drvdata(spi));
 
 	return 0;
 }

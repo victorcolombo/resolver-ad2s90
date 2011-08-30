@@ -342,7 +342,7 @@ static int __devinit ad5791_probe(struct spi_device *spi)
 		= &ad5791_channels[spi_get_device_id(spi)->driver_data];
 	indio_dev->num_channels = 1;
 	indio_dev->name = spi_get_device_id(st->spi)->name;
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_disable_reg_neg;
 
@@ -380,9 +380,9 @@ static int __devexit ad5791_remove(struct spi_device *spi)
 		regulator_disable(st->reg_vss);
 		regulator_put(st->reg_vss);
 	}
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

@@ -566,7 +566,7 @@ static int hmc5843_probe(struct i2c_client *client,
 	indio_dev->num_channels = ARRAY_SIZE(hmc5843_channels);
 	indio_dev->dev.parent = &client->dev;
 	indio_dev->modes = INDIO_DIRECT_MODE;
-	err = iio_device_register(indio_dev);
+	err = iio_st_device_register(indio_dev);
 	if (err)
 		goto exit_free2;
 	return 0;
@@ -581,7 +581,7 @@ static int hmc5843_remove(struct i2c_client *client)
 	struct iio_dev *indio_dev = i2c_get_clientdata(client);
 	 /*  sleep mode to save power */
 	hmc5843_configure(client, MODE_SLEEP);
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

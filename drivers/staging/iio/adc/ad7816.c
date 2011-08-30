@@ -408,7 +408,7 @@ static int __devinit ad7816_probe(struct spi_device *spi_dev)
 			goto error_free_gpio;
 	}
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_free_irq;
 
@@ -441,7 +441,7 @@ static int __devexit ad7816_remove(struct spi_device *spi_dev)
 	gpio_free(chip->busy_pin);
 	gpio_free(chip->convert_pin);
 	gpio_free(chip->rdwr_pin);
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

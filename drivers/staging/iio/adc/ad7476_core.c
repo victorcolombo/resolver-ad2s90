@@ -185,7 +185,7 @@ static int __devinit ad7476_probe(struct spi_device *spi)
 	if (ret)
 		goto error_cleanup_ring;
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_ring_unregister;
 	return 0;
@@ -217,7 +217,7 @@ static int ad7476_remove(struct spi_device *spi)
 		regulator_disable(st->reg);
 		regulator_put(st->reg);
 	}
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

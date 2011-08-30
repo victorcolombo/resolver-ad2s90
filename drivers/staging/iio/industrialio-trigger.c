@@ -473,7 +473,7 @@ void iio_free_trigger(struct iio_trigger *trig)
 }
 EXPORT_SYMBOL(iio_free_trigger);
 
-int iio_device_register_trigger_consumer(struct iio_dev *dev_info)
+int iio_st_device_register_trigger_consumer(struct iio_dev *dev_info)
 {
 	dev_info->groups[dev_info->groupcounter++] =
 		&iio_trigger_consumer_attr_group;
@@ -481,7 +481,7 @@ int iio_device_register_trigger_consumer(struct iio_dev *dev_info)
 	return 0;
 }
 
-void iio_device_unregister_trigger_consumer(struct iio_dev *dev_info)
+void iio_st_device_unregister_trigger_consumer(struct iio_dev *dev_info)
 {
 	/* Clean up and associated but not attached triggers references */
 	if (dev_info->trig)

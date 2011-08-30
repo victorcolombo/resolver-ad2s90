@@ -794,7 +794,7 @@ static int __devinit ade7758_probe(struct spi_device *spi)
 			goto error_uninitialize_ring;
 	}
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_remove_trigger;
 
@@ -832,7 +832,7 @@ static int ade7758_remove(struct spi_device *spi)
 	ade7758_unconfigure_ring(indio_dev);
 	kfree(st->tx);
 	kfree(st->rx);
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 err_ret:

@@ -1152,7 +1152,7 @@ static int __devinit sca3000_probe(struct spi_device *spi)
 	indio_dev->modes = INDIO_DIRECT_MODE;
 
 	sca3000_configure_ring(indio_dev);
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret < 0)
 		goto error_free_dev;
 	regdone = 1;
@@ -1191,7 +1191,7 @@ error_unregister_ring:
 error_unregister_dev:
 error_free_dev:
 	if (regdone)
-		iio_device_unregister(indio_dev);
+		iio_st_device_unregister(indio_dev);
 	else
 		iio_free_device(indio_dev);
 
@@ -1230,7 +1230,7 @@ static int sca3000_remove(struct spi_device *spi)
 		free_irq(spi->irq, indio_dev);
 	iio_buffer_unregister(indio_dev);
 	sca3000_unconfigure_ring(indio_dev);
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

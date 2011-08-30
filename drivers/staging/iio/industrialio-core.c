@@ -629,7 +629,7 @@ static ssize_t iio_show_dev_name(struct device *dev,
 
 static DEVICE_ATTR(name, S_IRUGO, iio_show_dev_name, NULL);
 
-static int iio_device_register_sysfs(struct iio_dev *dev_info)
+static int iio_st_device_register_sysfs(struct iio_dev *dev_info)
 {
 	int i, ret = 0, attrcount, attrn, attrcount_orig = 0;
 	struct iio_dev_attr *p, *n;
@@ -696,7 +696,7 @@ error_clear_attrs:
 	return ret;
 }
 
-static void iio_device_unregister_sysfs(struct iio_dev *dev_info)
+static void iio_st_device_unregister_sysfs(struct iio_dev *dev_info)
 {
 
 	struct iio_dev_attr *p, *n;
@@ -921,7 +921,7 @@ static void iio_setup_ev_int(struct iio_event_interface *ev_int)
 }
 
 static const char *iio_event_group_name = "events";
-static int iio_device_register_eventset(struct iio_dev *dev_info)
+static int iio_st_device_register_eventset(struct iio_dev *dev_info)
 {
 	struct iio_dev_attr *p;
 	int ret = 0, attrcount_orig = 0, attrcount, attrn;
@@ -987,7 +987,7 @@ error_ret:
 	return ret;
 }
 
-static void iio_device_unregister_eventset(struct iio_dev *dev_info)
+static void iio_st_device_unregister_eventset(struct iio_dev *dev_info)
 {
 	if (dev_info->event_interface == NULL)
 		return;
@@ -1001,9 +1001,9 @@ static void iio_dev_release(struct device *device)
 	struct iio_dev *dev_info = container_of(device, struct iio_dev, dev);
 	cdev_del(&dev_info->chrdev);
 	if (dev_info->modes & INDIO_BUFFER_TRIGGERED)
-		iio_device_unregister_trigger_consumer(dev_info);
-	iio_device_unregister_eventset(dev_info);
-	iio_device_unregister_sysfs(dev_info);
+		iio_st_device_unregister_trigger_consumer(dev_info);
+	iio_st_device_unregister_eventset(dev_info);
+	iio_st_device_unregister_sysfs(dev_info);
 	ida_simple_remove(&iio_ida, dev_info->id);
 	kfree(dev_info);
 }
@@ -1109,27 +1109,27 @@ static const struct file_operations iio_buffer_fileops = {
 	.compat_ioctl = iio_ioctl,
 };
 
-int iio_device_register(struct iio_dev *dev_info)
+int iio_st_device_register(struct iio_dev *dev_info)
 {
 	int ret;
 
 	/* configure elements for the chrdev */
 	dev_info->dev.devt = MKDEV(MAJOR(iio_devt), dev_info->id);
 
-	ret = iio_device_register_sysfs(dev_info);
+	ret = iio_st_device_register_sysfs(dev_info);
 	if (ret) {
 		dev_err(dev_info->dev.parent,
 			"Failed to register sysfs interfaces\n");
 		goto error_ret;
 	}
-	ret = iio_device_register_eventset(dev_info);
+	ret = iio_st_device_register_eventset(dev_info);
 	if (ret) {
 		dev_err(dev_info->dev.parent,
 			"Failed to register event set\n");
 		goto error_free_sysfs;
 	}
 	if (dev_info->modes & INDIO_BUFFER_TRIGGERED)
-		iio_device_register_trigger_consumer(dev_info);
+		iio_st_device_register_trigger_consumer(dev_info);
 
 	ret = device_add(&dev_info->dev);
 	if (ret < 0)
@@ -1144,19 +1144,19 @@ int iio_device_register(struct iio_dev *dev_info)
 error_del_device:
 	device_del(&dev_info->dev);
 error_unreg_eventset:
-	iio_device_unregister_eventset(dev_info);
+	iio_st_device_unregister_eventset(dev_info);
 error_free_sysfs:
-	iio_device_unregister_sysfs(dev_info);
+	iio_st_device_unregister_sysfs(dev_info);
 error_ret:
 	return ret;
 }
-EXPORT_SYMBOL(iio_device_register);
+EXPORT_SYMBOL(iio_st_device_register);
 
-void iio_device_unregister(struct iio_dev *dev_info)
+void iio_st_device_unregister(struct iio_dev *dev_info)
 {
 	device_unregister(&dev_info->dev);
 }
-EXPORT_SYMBOL(iio_device_unregister);
+EXPORT_SYMBOL(iio_st_device_unregister);
 subsys_initcall(iio_init);
 module_exit(iio_exit);
 

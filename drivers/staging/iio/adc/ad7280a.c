@@ -899,7 +899,7 @@ static int __devinit ad7280_probe(struct spi_device *spi)
 	if (ret < 0)
 		goto error_free_channels;
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_free_attr;
 	regdone = 1;
@@ -939,7 +939,7 @@ error_free_channels:
 
 error_free_device:
 	if (regdone)
-		iio_device_unregister(indio_dev);
+		iio_st_device_unregister(indio_dev);
 	else
 		iio_free_device(indio_dev);
 
@@ -959,7 +959,7 @@ static int __devexit ad7280_remove(struct spi_device *spi)
 
 	kfree(st->channels);
 	kfree(st->iio_attr);
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

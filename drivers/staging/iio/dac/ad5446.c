@@ -402,7 +402,7 @@ static int __devinit ad5446_probe(struct spi_device *spi)
 				 "reference voltage unspecified\n");
 	}
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_free_device;
 
@@ -426,7 +426,7 @@ static int ad5446_remove(struct spi_device *spi)
 	struct ad5446_state *st = iio_priv(indio_dev);
 	struct regulator *reg = st->reg;
 
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 	if (!IS_ERR(reg)) {
 		regulator_disable(reg);
 		regulator_put(reg);

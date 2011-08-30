@@ -228,7 +228,7 @@ static int __devinit ad7780_probe(struct spi_device *spi)
 
 	disable_irq(spi->irq);
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_free_irq;
 
@@ -261,7 +261,7 @@ static int ad7780_remove(struct spi_device *spi)
 		regulator_disable(st->reg);
 		regulator_put(st->reg);
 	}
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

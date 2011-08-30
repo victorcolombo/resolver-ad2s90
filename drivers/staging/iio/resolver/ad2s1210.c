@@ -761,7 +761,7 @@ static int __devinit ad2s1210_probe(struct spi_device *spi)
 	indio_dev->info = &ad2s1210_info;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_free_gpios;
 
@@ -786,7 +786,7 @@ static int __devexit ad2s1210_remove(struct spi_device *spi)
 	struct ad2s1210_state *st = iio_priv(indio_dev);
 
 	ad2s1210_free_gpios(st);
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	return 0;
 }

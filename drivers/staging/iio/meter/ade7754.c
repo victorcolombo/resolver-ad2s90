@@ -562,7 +562,7 @@ static int __devinit ade7754_probe(struct spi_device *spi)
 	ret = ade7754_initial_setup(indio_dev);
 	if (ret)
 		goto error_free_dev;
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_free_dev;
 
@@ -585,7 +585,7 @@ static int ade7754_remove(struct spi_device *spi)
 	if (ret)
 		goto err_ret;
 
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 err_ret:
 	return ret;
