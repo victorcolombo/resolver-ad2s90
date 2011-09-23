@@ -86,6 +86,8 @@ static const char * const iio_chan_info_postfix[] = {
 	[IIO_CHAN_INFO_QUADRATURE_CORRECTION_RAW_SHARED/2]
 	= "quadrature_correction_raw",
 	[IIO_CHAN_INFO_AVERAGE_RAW_SHARED/2] = "mean_raw",
+	[IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY_SHARED/2]
+	= "filter_low_pass_3db_frequency",
 };
 
 /**
