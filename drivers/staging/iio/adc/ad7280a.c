@@ -900,7 +900,7 @@ static int __devinit ad7280_probe(struct spi_device *spi)
 	if (ret < 0)
 		goto error_free_channels;
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_free_attr;
 
@@ -931,7 +931,7 @@ static int __devinit ad7280_probe(struct spi_device *spi)
 
 	return 0;
 error_unregister:
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 error_free_attr:
 	kfree(st->iio_attr);
@@ -952,7 +952,7 @@ static int __devexit ad7280_remove(struct spi_device *spi)
 
 	if (spi->irq > 0)
 		free_irq(spi->irq, indio_dev);
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 
 	ad7280_write(st, AD7280A_DEVADDR_MASTER, AD7280A_CONTROL_HB, 1,
 			AD7280A_CTRL_HB_PWRDN_SW | st->ctrl_hb);

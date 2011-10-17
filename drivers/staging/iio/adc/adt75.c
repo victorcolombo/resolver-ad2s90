@@ -593,7 +593,7 @@ static int __devinit adt75_probe(struct i2c_client *client,
 		}
 	}
 
-	ret = iio_device_register(indio_dev);
+	ret = iio_st_device_register(indio_dev);
 	if (ret)
 		goto error_unreg_irq;
 
@@ -613,7 +613,7 @@ static int __devexit adt75_remove(struct i2c_client *client)
 {
 	struct iio_dev *indio_dev = i2c_get_clientdata(client);
 
-	iio_device_unregister(indio_dev);
+	iio_st_device_unregister(indio_dev);
 	if (client->irq)
 		free_irq(client->irq, indio_dev);
 	iio_free_device(indio_dev);
