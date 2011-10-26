@@ -57,13 +57,10 @@ static irqreturn_t adis16240_trigger_handler(int irq, void *p)
 	struct iio_poll_func *pf = p;
 	struct iio_dev *indio_dev = pf->indio_dev;
 	struct adis16240_state *st = iio_priv(indio_dev);
-	struct iio_buffer *ring = indio_dev->buffer;
-
 	int i = 0;
 	s16 *data;
-	size_t datasize = ring->access->get_bytes_per_datum(ring);
 
-	data = kmalloc(datasize, GFP_KERNEL);
+	data = kmalloc(indio_dev->scan_bytes, GFP_KERNEL);
 	if (data == NULL) {
 		dev_err(&st->us->dev, "memory alloc failed in ring bh");
 		return -ENOMEM;
@@ -76,10 +73,10 @@ static irqreturn_t adis16240_trigger_handler(int irq, void *p)
 			data[i] = be16_to_cpup((__be16 *)&(st->rx[i*2]));
 
 	/* Guaranteed to be aligned with 8 byte boundary */
-	if (ring->scan_timestamp)
+	if (indio_dev->scan_timestamp)
 		*((s64 *)(data + ((i + 3)/4)*4)) = pf->timestamp;
 
-	ring->access->store_to(ring, (u8 *)data, pf->timestamp);
+	iio_push_to_buffers(indio_dev, (u8 *)data, pf->timestamp);
 
 	iio_trigger_notify_done(indio_dev->trig);
 	kfree(data);

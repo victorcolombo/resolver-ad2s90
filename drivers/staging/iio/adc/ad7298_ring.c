@@ -28,25 +28,17 @@
 static int ad7298_ring_preenable(struct iio_dev *indio_dev)
 {
 	struct ad7298_state *st = iio_priv(indio_dev);
-	struct iio_buffer *ring = indio_dev->buffer;
-	size_t d_size;
 	int i, m;
 	unsigned short command;
-	int scan_count = bitmap_weight(indio_dev->active_scan_mask,
-				       indio_dev->masklength);
-	d_size = scan_count * (AD7298_STORAGE_BITS / 8);
+	int scan_count, ret;
 
-	if (ring->scan_timestamp) {
-		d_size += sizeof(s64);
+	ret = iio_sw_buffer_preenable(indio_dev);
+	if (ret < 0)
+		return ret;
 
-		if (d_size % sizeof(s64))
-			d_size += sizeof(s64) - (d_size % sizeof(s64));
-	}
-
-	if (ring->access->set_bytes_per_datum)
-		ring->access->set_bytes_per_datum(ring, d_size);
-
-	st->d_size = d_size;
+	/* Now compute overall size */
+	scan_count = bitmap_weight(indio_dev->active_scan_mask,
+				   indio_dev->masklength);
 
 	command = AD7298_WRITE | st->ext_ref;
 
@@ -91,7 +83,6 @@ static irqreturn_t ad7298_trigger_handler(int irq, void *p)
 	struct iio_poll_func *pf = p;
 	struct iio_dev *indio_dev = pf->indio_dev;
 	struct ad7298_state *st = iio_priv(indio_dev);
-	struct iio_buffer *ring = indio_dev->buffer;
 	s64 time_ns;
 	__u16 buf[16];
 	int b_sent, i;
@@ -100,17 +91,17 @@ static irqreturn_t ad7298_trigger_handler(int irq, void *p)
 	if (b_sent)
 		return b_sent;
 
-	if (ring->scan_timestamp) {
+	if (indio_dev->scan_timestamp) {
 		time_ns = iio_get_time_ns();
-		memcpy((u8 *)buf + st->d_size - sizeof(s64),
+		memcpy((u8 *)buf + indio_dev->scan_bytes - sizeof(s64),
 			&time_ns, sizeof(time_ns));
 	}
 
 	for (i = 0; i < bitmap_weight(indio_dev->active_scan_mask,
-						 indio_dev->masklength); i++)
+				      indio_dev->masklength); i++)
 		buf[i] = be16_to_cpu(st->rx_buf[i]);
 
-	indio_dev->buffer->access->store_to(ring, (u8 *)buf, time_ns);
+	iio_push_to_buffers(indio_dev, (u8 *)buf, time_ns);
 	iio_trigger_notify_done(indio_dev->trig);
 
 	return IRQ_HANDLED;
