@@ -11,6 +11,18 @@ menuconfig IIO
 	  number of different physical interfaces (i2c, spi, etc). See
 	  drivers/staging/iio/Documentation for more information.
 if IIO
+
+config IIO_ST_INPUT
+	tristate "Input driver that uses channels specified via iio maps"
+	depends on INPUT
+	depends on IIO_BUFFER
+	select IIO_BUFFER_CB
+	help
+	  Client driver for IIO via the push interfaces.  Used to provide
+	  and input interface for IIO devices that can feed a buffer on
+	  a trigger interrupt.  Note that all channels must come from a
+	  single IIO supported device.
+
 config IIO_ST_HWMON
 	tristate "Hwmon driver that uses channels specified via iio maps"
 	depends on HWMON
