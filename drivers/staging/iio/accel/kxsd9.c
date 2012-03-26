@@ -181,7 +181,8 @@ error_ret:
 		.type = IIO_ACCEL,					\
 		.modified = 1,						\
 		.channel2 = IIO_MOD_##axis,				\
-		.info_mask = IIO_CHAN_INFO_SCALE_SHARED_BIT,		\
+		.info_mask = IIO_CHAN_INFO_VALUE_SEPARATE_BIT |		\
+			IIO_CHAN_INFO_SCALE_SHARED_BIT,			\
 		.address = KXSD9_REG_##axis,				\
 	}
 
@@ -189,6 +190,7 @@ static struct iio_chan_spec kxsd9_channels[] = {
 	KXSD9_ACCEL_CHAN(X), KXSD9_ACCEL_CHAN(Y), KXSD9_ACCEL_CHAN(Z),
 	{
 		.type = IIO_VOLTAGE,
+		.info_mask = IIO_CHAN_INFO_VALUE_SEPARATE_BIT,
 		.indexed = 1,
 		.address = KXSD9_REG_AUX,
 	}
