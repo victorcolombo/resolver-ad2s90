@@ -581,20 +581,21 @@ static int iio_device_add_channel_sysfs(struct iio_dev *indio_dev,
 
 	if (chan->channel < 0)
 		return 0;
-
-	ret = __iio_add_chan_devattr(iio_data_type_name[chan->processed_val],
-				     chan,
-				     &iio_read_channel_info,
-				     (chan->output ?
-				      &iio_write_channel_info : NULL),
-				     0,
-				     0,
-				     &indio_dev->dev,
-				     &indio_dev->channel_attr_list);
-	if (ret)
-		goto error_ret;
-	attrcount++;
-
+	if (chan->info_mask & IIO_CHAN_INFO_VALUE_SEPARATE_BIT) {
+		ret = __iio_add_chan_devattr(iio_data_type_name[chan->
+								processed_val],
+					     chan,
+					     &iio_read_channel_info,
+					     (chan->output ?
+					      &iio_write_channel_info : NULL),
+					     0,
+					     0,
+					     &indio_dev->dev,
+					     &indio_dev->channel_attr_list);
+		if (ret)
+			goto error_ret;
+		attrcount++;
+	}
 	for_each_set_bit_from(i, &chan->info_mask, sizeof(long)*8) {
 		ret = __iio_add_chan_devattr(iio_chan_info_postfix[i/2],
 					     chan,
