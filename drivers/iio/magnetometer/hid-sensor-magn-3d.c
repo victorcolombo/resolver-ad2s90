@@ -389,7 +389,7 @@ error_ret:
 }
 
 /* Function to deinitialize the processing for usage id */
-static int __devinit hid_magn_3d_remove(struct platform_device *pdev)
+static int __devexit hid_magn_3d_remove(struct platform_device *pdev)
 {
 	struct hid_sensor_hub_device *hsdev = pdev->dev.platform_data;
 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
@@ -410,7 +410,7 @@ static struct platform_driver hid_magn_3d_platform_driver = {
 		.owner	= THIS_MODULE,
 	},
 	.probe		= hid_magn_3d_probe,
-	.remove		= hid_magn_3d_remove,
+	.remove		= __devexit_p(hid_magn_3d_remove),
 };
 module_platform_driver(hid_magn_3d_platform_driver);
 
