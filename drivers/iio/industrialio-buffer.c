@@ -80,6 +80,7 @@ void iio_buffer_init(struct iio_buffer *buffer)
 {
 	INIT_LIST_HEAD(&buffer->demux_list);
 	init_waitqueue_head(&buffer->pollq);
+	kref_init(&buffer->ref);
 }
 EXPORT_SYMBOL(iio_buffer_init);
 
@@ -460,6 +461,19 @@ static int iio_compute_scan_bytes(struct iio_dev *indio_dev, const long *mask,
 	return bytes;
 }
 
+static void iio_buffer_activate(struct iio_dev *indio_dev,
+	struct iio_buffer *buffer)
+{
+	iio_buffer_get(buffer);
+	list_add(&buffer->buffer_list, &indio_dev->buffer_list);
+}
+
+static void iio_buffer_deactivate(struct iio_buffer *buffer)
+{
+	list_del_init(&buffer->buffer_list);
+	iio_buffer_put(buffer);
+}
+
 void iio_disable_all_buffers(struct iio_dev *indio_dev)
 {
 	struct iio_buffer *buffer, *_buffer;
@@ -472,7 +486,7 @@ void iio_disable_all_buffers(struct iio_dev *indio_dev)
 
 	list_for_each_entry_safe(buffer, _buffer,
 			&indio_dev->buffer_list, buffer_list)
-		list_del_init(&buffer->buffer_list);
+		iio_buffer_deactivate(buffer);
 
 	indio_dev->currentmode = INDIO_DIRECT_MODE;
 	if (indio_dev->setup_ops->postdisable)
@@ -509,9 +523,9 @@ int iio_update_buffers(struct iio_dev *indio_dev,
 		indio_dev->active_scan_mask = NULL;
 
 	if (remove_buffer)
-		list_del(&remove_buffer->buffer_list);
+		iio_buffer_deactivate(remove_buffer);
 	if (insert_buffer)
-		list_add(&insert_buffer->buffer_list, &indio_dev->buffer_list);
+		iio_buffer_activate(indio_dev, insert_buffer);
 
 	/* If no buffers in list, we are done */
 	if (list_empty(&indio_dev->buffer_list)) {
@@ -546,7 +560,7 @@ int iio_update_buffers(struct iio_dev *indio_dev,
 			 * Roll back.
 			 * Note can only occur when adding a buffer.
 			 */
-			list_del(&insert_buffer->buffer_list);
+			iio_buffer_deactivate(insert_buffer);
 			if (old_mask) {
 				indio_dev->active_scan_mask = old_mask;
 				success = -EINVAL;
@@ -637,7 +651,7 @@ error_run_postdisable:
 error_remove_inserted:
 
 	if (insert_buffer)
-		list_del(&insert_buffer->buffer_list);
+		iio_buffer_deactivate(insert_buffer);
 	indio_dev->active_scan_mask = old_mask;
 	kfree(compound_mask);
 error_ret:
@@ -958,3 +972,20 @@ error_clear_mux_table:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(iio_update_demux);
+
+/**
+ * __iio_buffer_release() - Free a buffer's resources
+ * @ref: Pointer to the kref embedded in the iio_buffer struct
+ *
+ * This function is called when the last reference to the buffer has been
+ * dropped. It will typically free all resources allocated by the buffer. Do not
+ * call this function manually, always use iio_buffer_put() when done using a
+ * buffer.
+ */
+void __iio_buffer_release(struct kref *ref)
+{
+	struct iio_buffer *buffer = container_of(ref, struct iio_buffer, ref);
+
+	buffer->access->release(buffer);
+}
+EXPORT_SYMBOL_GPL(__iio_buffer_release);
