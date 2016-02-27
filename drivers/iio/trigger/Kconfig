@@ -5,6 +5,11 @@
 
 menu "Triggers - standalone"
 
+config IIO_TIGHTLOOP_TRIGGER
+	tristate "A kthread based hammering loop trigger"
+	help
+	  A horrible bodge as an experiment.
+
 config IIO_HRTIMER_TRIGGER
 	tristate "High resolution timer trigger"
 	depends on IIO_SW_TRIGGER
