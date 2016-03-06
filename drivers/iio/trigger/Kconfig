@@ -7,6 +7,7 @@ menu "Triggers - standalone"
 
 config IIO_TIGHTLOOP_TRIGGER
 	tristate "A kthread based hammering loop trigger"
+	depends on IIO_SW_TRIGGER
 	help
 	  A horrible bodge as an experiment.
 

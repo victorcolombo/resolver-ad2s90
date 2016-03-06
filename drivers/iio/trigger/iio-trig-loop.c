@@ -35,80 +35,17 @@
 
 #include <linux/iio/iio.h>
 #include <linux/iio/trigger.h>
+#include <linux/iio/sw_trigger.h>
 
-struct iio_loop_trig {
-	struct iio_trigger *trig;
+struct iio_loop_info {
+	struct iio_sw_trigger swt;
 	struct task_struct *task;
 	int id;
 	struct list_head l;
 };
 
-static LIST_HEAD(iio_loop_trig_list);
-static DEFINE_MUTEX(iio_loop_trig_list_mut);
-
-static int iio_loop_trigger_probe(int id);
-static ssize_t iio_loop_trig_add(struct device *dev,
-				  struct device_attribute *attr,
-				  const char *buf,
-				  size_t len)
-{
-	int ret;
-	unsigned long input;
-
-	ret = kstrtoul(buf, 10, &input);
-	if (ret)
-		return ret;
-	ret = iio_loop_trigger_probe(input);
-	if (ret)
-		return ret;
-	return len;
-}
-static DEVICE_ATTR(add_trigger, S_IWUSR, NULL, &iio_loop_trig_add);
-
-static int iio_loop_trigger_remove(int id);
-static ssize_t iio_loop_trig_remove(struct device *dev,
-				     struct device_attribute *attr,
-				     const char *buf,
-				     size_t len)
-{
-	int ret;
-	unsigned long input;
-
-	ret = kstrtoul(buf, 10, &input);
-	if (ret)
-		return ret;
-	ret = iio_loop_trigger_remove(input);
-	if (ret)
-		return ret;
-	return len;
-}
-
-static DEVICE_ATTR(remove_trigger, S_IWUSR, NULL, &iio_loop_trig_remove);
-
-static struct attribute *iio_loop_trig_attrs[] = {
-	&dev_attr_add_trigger.attr,
-	&dev_attr_remove_trigger.attr,
-	NULL,
-};
-
-static const struct attribute_group iio_loop_trig_group = {
-	.attrs = iio_loop_trig_attrs,
-};
-
-static const struct attribute_group *iio_loop_trig_groups[] = {
-	&iio_loop_trig_group,
-	NULL
-};
-
-/* Nothing to actually do upon release */
-static void iio_trigger_loop_release(struct device *dev)
-{
-}
-
-static struct device iio_loop_trig_dev = {
-	.bus = &iio_bus_type,
-	.groups = iio_loop_trig_groups,
-	.release = &iio_trigger_loop_release,
+static struct config_item_type iio_loop_type = {
+	.ct_owner = THIS_MODULE,
 };
 
 static int iio_loop_thread(void *data)
@@ -126,7 +63,7 @@ static int iio_loop_thread(void *data)
 
 static int iio_loop_trigger_set_state(struct iio_trigger *trig, bool state)
 {
-	struct iio_loop_trig *loop_trig = iio_trigger_get_drvdata(trig);
+	struct iio_loop_info *loop_trig = iio_trigger_get_drvdata(trig);
 
 	if (state) {
 		loop_trig->task = kthread_run(iio_loop_thread, trig, trig->name);
@@ -147,97 +84,65 @@ static const struct iio_trigger_ops iio_loop_trigger_ops = {
 	.owner = THIS_MODULE,
 };
 
-static int iio_loop_trigger_probe(int id)
+static struct iio_sw_trigger *iio_trig_loop_probe(const char *name)
 {
-	struct iio_loop_trig *t;
+	struct iio_loop_info *trig_info;
 	int ret;
-	bool foundit = false;
 
-	mutex_lock(&iio_loop_trig_list_mut);
-	list_for_each_entry(t, &iio_loop_trig_list, l)
-		if (id == t->id) {
-			foundit = true;
-			break;
-		}
-	if (foundit) {
-		ret = -EINVAL;
-		goto out1;
-	}
-	t = kmalloc(sizeof(*t), GFP_KERNEL);
-	if (t == NULL) {
+	trig_info = kzalloc(sizeof(*trig_info), GFP_KERNEL);
+	if (!trig_info)
+		return ERR_PTR(-ENOMEM);
+
+	trig_info->swt.trigger = iio_trigger_alloc("%s", name);
+	if (!trig_info->swt.trigger) {
 		ret = -ENOMEM;
-		goto out1;
-	}
-	t->id = id;
-	t->trig = iio_trigger_alloc("looptrig%d", id);
-	if (!t->trig) {
-		ret = -ENOMEM;
-		goto free_t;
+		goto err_free_trig_info;
 	}
 
-	t->trig->ops = &iio_loop_trigger_ops;
-	t->trig->dev.parent = &iio_loop_trig_dev;
-	iio_trigger_set_drvdata(t->trig, t);
+	iio_trigger_set_drvdata(trig_info->swt.trigger, trig_info);
+	trig_info->swt.trigger->ops = &iio_loop_trigger_ops;
 
-	ret = iio_trigger_register(t->trig);
+	ret = iio_trigger_register(trig_info->swt.trigger);
 	if (ret)
-		goto out2;
-	list_add(&t->l, &iio_loop_trig_list);
-	__module_get(THIS_MODULE);
-	mutex_unlock(&iio_loop_trig_list_mut);
-	
+		goto err_free_trigger;
 
-	return 0;
+	iio_swt_group_init_type_name(&trig_info->swt, name, &iio_loop_type);
 
-out2:
-	iio_trigger_put(t->trig);
-free_t:
-	kfree(t);
-out1:
-	mutex_unlock(&iio_loop_trig_list_mut);
-	return ret;
+	return &trig_info->swt;
+
+err_free_trigger:
+	iio_trigger_free(trig_info->swt.trigger);
+err_free_trig_info:
+	kfree(trig_info);
+
+	return ERR_PTR(ret);
 }
 
-static int iio_loop_trigger_remove(int id)
+static int iio_trig_loop_remove(struct iio_sw_trigger *swt)
 {
-	bool foundit = false;
-	struct iio_loop_trig *t;
+	struct iio_loop_info *trig_info;
 
-	mutex_lock(&iio_loop_trig_list_mut);
-	list_for_each_entry(t, &iio_loop_trig_list, l)
-		if (id == t->id) {
-			foundit = true;
-			break;
-		}
-	if (!foundit) {
-		mutex_unlock(&iio_loop_trig_list_mut);
-		return -EINVAL;
-	}
+	trig_info = iio_trigger_get_drvdata(swt->trigger);
 
-	iio_trigger_unregister(t->trig);
-	iio_trigger_free(t->trig);
-
-	list_del(&t->l);
-	kfree(t);
-	module_put(THIS_MODULE);
-	mutex_unlock(&iio_loop_trig_list_mut);
+	iio_trigger_unregister(swt->trigger);
+	iio_trigger_free(swt->trigger);
+	kfree(trig_info);
 
 	return 0;
 }
 
-static int __init iio_loop_trig_init(void)
-{
-	device_initialize(&iio_loop_trig_dev);
-	dev_set_name(&iio_loop_trig_dev, "iio_loop_trigger");
-	return device_add(&iio_loop_trig_dev);
-}
-module_init(iio_loop_trig_init);
+static const struct iio_sw_trigger_ops iio_trig_loop_ops = {
+	.probe = iio_trig_loop_probe,
+	.remove = iio_trig_loop_remove,
+};
 
-static void __exit iio_loop_trig_exit(void)
-{
-	device_unregister(&iio_loop_trig_dev);
-}
-module_exit(iio_loop_trig_exit);
+static struct iio_sw_trigger_type iio_trig_loop = {
+	.name = "loop",
+	.owner = THIS_MODULE,
+	.ops = &iio_trig_loop_ops,
+};
+
+module_iio_sw_trigger_driver(iio_trig_loop);
 
 MODULE_AUTHOR("Jonathan Cameron <jic23@kernel.org>");
 MODULE_DESCRIPTION("Loop based trigger for the iio subsystem");
