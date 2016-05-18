@@ -153,6 +153,11 @@ struct inv_mpu6050_state {
 	/* Value of I2C_MST_STATUS after slv4_done */
 	u8 slv4_done_status;
 #endif
+
+#define INV_MPU6050_MAX_SCAN_ELEMENTS 7
+	unsigned int scan_offsets[INV_MPU6050_MAX_SCAN_ELEMENTS];
+	unsigned int scan_lengths[INV_MPU6050_MAX_SCAN_ELEMENTS];
+	bool realign_required;
 };
 
 /*register and associated bit definition*/
@@ -274,6 +279,9 @@ enum inv_mpu6050_scan {
 	INV_MPU6050_SCAN_GYRO_Z,
 	INV_MPU6050_SCAN_TIMESTAMP,
 };
+
+#define INV_MPU6050_SCAN_MASK_ACCEL    0x07
+#define INV_MPU6050_SCAN_MASK_GYRO     0x38
 
 enum inv_mpu6050_filter_e {
 	INV_MPU6050_FILTER_256HZ_NOLPF2 = 0,
