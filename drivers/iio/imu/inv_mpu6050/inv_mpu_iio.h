@@ -81,6 +81,7 @@ enum inv_devices {
  *  @enable:		master enable state.
  *  @accl_fifo_enable:	enable accel data output
  *  @gyro_fifo_enable:	enable gyro data output
+ *  @user_ctrl:		The non-volatile bits of user_ctrl
  *  @fifo_rate:		FIFO update rate.
  */
 struct inv_mpu6050_chip_config {
@@ -90,6 +91,7 @@ struct inv_mpu6050_chip_config {
 	unsigned int enable:1;
 	unsigned int accl_fifo_enable:1;
 	unsigned int gyro_fifo_enable:1;
+	u8 user_ctrl;
 	u16 fifo_rate;
 };
 

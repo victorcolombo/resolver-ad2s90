@@ -74,7 +74,9 @@ static int inv_mpu6050_set_enable(struct iio_dev *indio_dev, bool enable)
 		if (result)
 			return result;
 
-		result = regmap_write(st->map, st->reg->user_ctrl, 0);
+		st->chip_config.user_ctrl &= ~INV_MPU6050_BIT_FIFO_EN;
+		result = regmap_write(st->map, st->reg->user_ctrl,
+				      st->chip_config.user_ctrl);
 		if (result)
 			return result;
 
