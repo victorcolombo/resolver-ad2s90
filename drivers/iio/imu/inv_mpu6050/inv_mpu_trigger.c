@@ -61,6 +61,11 @@ static int inv_mpu6050_set_enable(struct iio_dev *indio_dev, bool enable)
 			if (result)
 				return result;
 		}
+
+		result = inv_mpu_slave_enable_mask(st, *indio_dev->active_scan_mask);
+		if (result)
+			return result;
+
 		result = inv_reset_fifo(indio_dev);
 		if (result)
 			return result;
@@ -77,6 +82,10 @@ static int inv_mpu6050_set_enable(struct iio_dev *indio_dev, bool enable)
 		st->chip_config.user_ctrl &= ~INV_MPU6050_BIT_FIFO_EN;
 		result = regmap_write(st->map, st->reg->user_ctrl,
 				      st->chip_config.user_ctrl);
+		if (result)
+			return result;
+
+		result = inv_mpu_slave_enable_mask(st, 0);
 		if (result)
 			return result;
 

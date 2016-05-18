@@ -125,6 +125,9 @@ static bool inv_mpu6050_volatile_reg(struct device *dev, unsigned int reg)
 		return true;
 	if (reg >= INV_MPU6050_REG_RAW_GYRO && reg < INV_MPU6050_REG_RAW_GYRO + 6)
 		return true;
+	if (reg < INV_MPU6050_REG_EXT_SENS_DATA_00 + INV_MPU6050_CNT_EXT_SENS_DATA &&
+			reg >= INV_MPU6050_REG_EXT_SENS_DATA_00)
+		return true;
 	switch (reg) {
 	case INV_MPU6050_REG_TEMPERATURE:
 	case INV_MPU6050_REG_TEMPERATURE + 1:
@@ -334,8 +337,24 @@ inv_mpu6050_read_raw(struct iio_dev *indio_dev,
 		     struct iio_chan_spec const *chan,
 		     int *val, int *val2, long mask)
 {
-	struct inv_mpu6050_state  *st = iio_priv(indio_dev);
+	struct inv_mpu6050_state *st = iio_priv(indio_dev);
 	int ret = 0;
+	int chan_index;
+
+	if (chan > indio_dev->channels + indio_dev->num_channels ||
+			chan < indio_dev->channels)
+		return -EINVAL;
+	chan_index = chan - indio_dev->channels;
+	if (chan_index >= INV_MPU6050_NUM_INT_CHAN) {
+		struct inv_mpu_ext_chan_state *ext_chan_state =
+				&st->ext_chan[chan_index - INV_MPU6050_NUM_INT_CHAN];
+		struct inv_mpu_ext_sens_state *ext_sens_state =
+				&st->ext_sens[ext_chan_state->ext_sens_index];
+		struct iio_dev *orig_dev = ext_sens_state->orig_dev;
+		const struct iio_chan_spec *orig_chan =
+				&orig_dev->channels[ext_chan_state->orig_chan_index];
+		return orig_dev->info->read_raw(orig_dev, orig_chan, val, val2, mask);
+	}
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
@@ -517,8 +536,24 @@ static int inv_mpu6050_write_raw(struct iio_dev *indio_dev,
 				 struct iio_chan_spec const *chan,
 				 int val, int val2, long mask)
 {
-	struct inv_mpu6050_state  *st = iio_priv(indio_dev);
+	struct inv_mpu6050_state *st = iio_priv(indio_dev);
+	int chan_index;
 	int result;
+
+	if (chan > indio_dev->channels + indio_dev->num_channels ||
+			chan < indio_dev->channels)
+		return -EINVAL;
+	chan_index = chan - indio_dev->channels;
+	if (chan_index >= INV_MPU6050_NUM_INT_CHAN) {
+		struct inv_mpu_ext_chan_state *ext_chan_state =
+				&st->ext_chan[chan_index - INV_MPU6050_NUM_INT_CHAN];
+		struct inv_mpu_ext_sens_state *ext_sens_state =
+				&st->ext_sens[ext_chan_state->ext_sens_index];
+		struct iio_dev *orig_dev = ext_sens_state->orig_dev;
+		const struct iio_chan_spec *orig_chan =
+				&orig_dev->channels[ext_chan_state->orig_chan_index];
+		return orig_dev->info->write_raw(orig_dev, orig_chan, val, val2, mask);
+	}
 
 	mutex_lock(&indio_dev->mlock);
 	/*
@@ -807,6 +842,346 @@ static const struct iio_info mpu_info = {
 	.attrs = &inv_attribute_group,
 	.validate_trigger = inv_mpu6050_validate_trigger,
 };
+
+extern struct device_type iio_device_type;
+
+static int iio_device_from_i2c_client_match(struct device *dev, void *data)
+{
+	return dev->type == &iio_device_type;
+}
+
+static struct iio_dev* iio_device_from_i2c_client(struct i2c_client* i2c)
+{
+	struct device *child;
+
+	child = device_find_child(&i2c->dev, NULL, iio_device_from_i2c_client_match);
+
+	return (child ? dev_to_iio_dev(child) : NULL);
+}
+
+static int inv_mpu_slave_enable(struct inv_mpu6050_state *st, int index, bool state)
+{
+	return regmap_update_bits(st->map, INV_MPU6050_REG_I2C_SLV_CTRL(index),
+				  INV_MPU6050_BIT_I2C_SLV_EN,
+				  state ? INV_MPU6050_BIT_I2C_SLV_EN : 0);
+}
+
+/* Enable slaves based on scan mask */
+int inv_mpu_slave_enable_mask(struct inv_mpu6050_state *st,
+			      const unsigned long mask)
+{
+	int i, result;
+
+	for (i = 0; i < INV_MPU6050_MAX_EXT_SENSORS; ++i) {
+		long slave_mask = st->ext_sens[i].scan_mask;
+		result = inv_mpu_slave_enable(st, i, slave_mask & mask);
+		if (result)
+			return result;
+	}
+
+	return 0;
+}
+
+static int inv_mpu_parse_one_ext_sens(struct device *dev,
+				      struct device_node *np,
+				      struct inv_mpu_ext_sens_spec *spec)
+{
+	int result;
+	u32 addr, reg, len;
+
+	result = of_property_read_u32(np, "invensense,addr", &addr);
+	if (result)
+		return result;
+	result = of_property_read_u32(np, "invensense,reg", &reg);
+	if (result)
+		return result;
+	result = of_property_read_u32(np, "invensense,len", &len);
+	if (result)
+		return result;
+
+	spec->addr = addr;
+	spec->reg = reg;
+	spec->len = len;
+
+	result = of_property_count_u32_elems(np, "invensense,external-channels");
+	if (result < 0)
+		return result;
+	spec->num_ext_channels = result;
+	spec->ext_channels = devm_kmalloc(dev, spec->num_ext_channels * sizeof(*spec->ext_channels), GFP_KERNEL);
+	if (!spec->ext_channels)
+		return -ENOMEM;
+	result = of_property_read_u32_array(np, "invensense,external-channels",
+					    spec->ext_channels,
+					    spec->num_ext_channels);
+	if (result)
+		return result;
+
+	return 0;
+}
+
+static int inv_mpu_parse_ext_sens(struct device *dev,
+				  struct device_node *node,
+				  struct inv_mpu_ext_sens_spec *specs)
+{
+	struct device_node *child;
+	int result;
+	u32 reg;
+
+	for_each_available_child_of_node(node, child) {
+		result = of_property_read_u32(child, "reg", &reg);
+		if (result)
+			return result;
+		if (reg > INV_MPU6050_MAX_EXT_SENSORS) {
+			dev_err(dev, "External sensor index %u out of range, max %d\n",
+				reg, INV_MPU6050_MAX_EXT_SENSORS);
+			return -EINVAL;
+		}
+		result = inv_mpu_parse_one_ext_sens(dev, child, &specs[reg]);
+		if (result)
+			return result;
+	}
+
+	return 0;
+}
+
+static int inv_mpu_get_ext_sens_spec(struct iio_dev *indio_dev)
+{
+	struct inv_mpu6050_state *st = iio_priv(indio_dev);
+	struct device *dev = regmap_get_device(st->map);
+	struct device_node *node;
+	int result;
+
+	node = of_get_child_by_name(dev->of_node, "invensense,external-sensors");
+	if (node) {
+		result = inv_mpu_parse_ext_sens(dev, node, st->ext_sens_spec);
+		if (result)
+			dev_err(dev, "Failed to parsing external-sensors devicetree data\n");
+		return result;
+	}
+
+	return 0;
+}
+
+/* Struct used while enumerating devices and matching them */
+struct inv_mpu_handle_ext_sensor_fnarg
+{
+	struct iio_dev *indio_dev;
+
+	/* Current scan index */
+	int scan_index;
+	/* Current channel index */
+	int chan_index;
+	/* Non-const pointer to channels */
+	struct iio_chan_spec *channels;
+};
+
+/*
+ * Write initial configuration of a slave at probe time.
+ *
+ * This is mostly fixed except for enabling/disabling individual slaves.
+ */
+static int inv_mpu_config_external_read(struct inv_mpu6050_state *st, int index,
+					const struct inv_mpu_ext_sens_spec *spec)
+{
+	int result;
+
+	result = regmap_write(st->map, INV_MPU6050_REG_I2C_SLV_ADDR(index),
+			      INV_MPU6050_BIT_I2C_SLV_RW | spec->addr);
+	if (result)
+		return result;
+	result = regmap_write(st->map, INV_MPU6050_REG_I2C_SLV_REG(index), spec->reg);
+	if (result)
+		return result;
+	result = regmap_write(st->map, INV_MPU6050_REG_I2C_SLV_CTRL(index),
+			      spec->len);
+	if (result)
+		return result;
+
+	return result;
+}
+
+/* Handle one device */
+static int inv_mpu_handle_slave_device(
+		struct inv_mpu_handle_ext_sensor_fnarg *fnarg,
+		int slave_index,
+		struct iio_dev *orig_dev)
+{
+	int i, j;
+	int data_offset;
+	struct iio_dev *indio_dev = fnarg->indio_dev;
+	struct inv_mpu6050_state *st = iio_priv(indio_dev);
+	struct device *mydev = regmap_get_device(st->map);
+	struct inv_mpu_ext_sens_spec *ext_sens_spec =
+			&st->ext_sens_spec[slave_index];
+	struct inv_mpu_ext_sens_state *ext_sens_state =
+			&st->ext_sens[slave_index];
+
+	dev_info(mydev, "slave %d is device %s\n",
+			slave_index, orig_dev->name ?: dev_name(&orig_dev->dev));
+	ext_sens_state->orig_dev = orig_dev;
+	ext_sens_state->scan_mask = 0;
+	data_offset = 0;
+
+	/* handle channels: */
+	for (i = 0; i < ext_sens_spec->num_ext_channels; ++i) {
+		int orig_chan_index = -1;
+		const struct iio_chan_spec *orig_chan_spec;
+		struct iio_chan_spec *chan_spec;
+		struct inv_mpu_ext_chan_state *chan_state;
+
+		for (j = 0; j < orig_dev->num_channels; ++j)
+			if (orig_dev->channels[j].scan_index == ext_sens_spec->ext_channels[i]) {
+				orig_chan_index = j;
+				break;
+			}
+
+		if (orig_chan_index < 0) {
+			dev_err(mydev, "Could not find slave channel with scan_index %d\n",
+					ext_sens_spec->ext_channels[i]);
+		}
+
+		orig_chan_spec = &orig_dev->channels[orig_chan_index];
+		chan_spec = &fnarg->channels[INV_MPU6050_NUM_INT_CHAN + fnarg->chan_index];
+		chan_state = &st->ext_chan[fnarg->chan_index];
+
+		chan_state->ext_sens_index = slave_index;
+		chan_state->orig_chan_index = orig_chan_index;
+		chan_state->data_offset = data_offset;
+		memcpy(chan_spec, orig_chan_spec, sizeof(struct iio_chan_spec));
+		chan_spec->scan_index = fnarg->scan_index;
+		ext_sens_state->scan_mask |= (1 << chan_spec->scan_index);
+
+		fnarg->scan_index++;
+		fnarg->chan_index++;
+		data_offset += chan_spec->scan_type.storagebits / 8;
+		dev_info(mydev, "Reading external channel #%d scan_index %d data_offset %d"
+				" from original device %s chan #%d scan_index %d\n",
+				fnarg->chan_index, chan_spec->scan_index, chan_state->data_offset,
+				orig_dev->name ?: dev_name(&orig_dev->dev), orig_chan_index, orig_chan_spec->scan_index);
+	}
+	if (ext_sens_spec->len != data_offset) {
+		dev_err(mydev, "slave %d length mismatch between "
+				"i2c slave read length (%d) and "
+				"sum of channel sizes (%d)\n",
+				slave_index, ext_sens_spec->len, data_offset);
+		return -EINVAL;
+	}
+
+	return inv_mpu_config_external_read(st, slave_index, ext_sens_spec);
+}
+
+/* device_for_each_child enum function */
+static int inv_mpu_handle_ext_sensor_fn(struct device *dev, void *data)
+{
+	struct inv_mpu_handle_ext_sensor_fnarg *fnarg = data;
+	struct iio_dev *indio_dev = fnarg->indio_dev;
+	struct inv_mpu6050_state *st = iio_priv(indio_dev);
+	struct i2c_client *client;
+	struct iio_dev *orig_dev;
+	int i, result;
+
+	client = i2c_verify_client(dev);
+	if (!client)
+		return 0;
+	orig_dev = iio_device_from_i2c_client(client);
+	if (!orig_dev)
+		return 0;
+
+	for (i = 0; i < INV_MPU6050_MAX_EXT_SENSORS; ++i) {
+		if (st->ext_sens_spec[i].addr != client->addr)
+			continue;
+		if (st->ext_sens[i].orig_dev) {
+			dev_warn(&indio_dev->dev, "already found slave with at addr %d\n", client->addr);
+			continue;
+		}
+
+		result = inv_mpu_handle_slave_device(fnarg, i, orig_dev);
+		if (result)
+			return result;
+	}
+	return 0;
+}
+
+static int inv_mpu6050_handle_ext_sensors(struct iio_dev *indio_dev)
+{
+	struct inv_mpu6050_state *st = iio_priv(indio_dev);
+	struct device *dev = regmap_get_device(st->map);
+	struct inv_mpu_handle_ext_sensor_fnarg fnarg = {
+		.indio_dev = indio_dev,
+		.chan_index = 0,
+		.scan_index = INV_MPU6050_SCAN_TIMESTAMP,
+	};
+	int i, result;
+	int num_ext_chan = 0, sum_data_len = 0;
+	int num_scan_elements;
+
+	inv_mpu_get_ext_sens_spec(indio_dev);
+	for (i = 0; i < INV_MPU6050_MAX_EXT_SENSORS; ++i) {
+		num_ext_chan += st->ext_sens_spec[i].num_ext_channels;
+		sum_data_len += st->ext_sens_spec[i].len;
+	}
+	if (sum_data_len > INV_MPU6050_CNT_EXT_SENS_DATA) {
+		dev_err(dev, "Too many bytes from external sensors:"
+			      " requested=%d max=%d\n",
+			      sum_data_len, INV_MPU6050_CNT_EXT_SENS_DATA);
+		return -EINVAL;
+	}
+
+	/* Allocate scan_offsets/scan_lengths */
+	num_scan_elements = INV_MPU6050_NUM_INT_SCAN_ELEMENTS + num_ext_chan;
+	st->scan_offsets = devm_kmalloc(dev, num_scan_elements * sizeof(int), GFP_KERNEL);
+	if (!st->scan_offsets)
+		return -ENOMEM;
+	st->scan_lengths = devm_kmalloc(dev, num_scan_elements * sizeof(int), GFP_KERNEL);
+	if (!st->scan_lengths)
+		return -ENOMEM;
+
+	/* Zero length means nothing to do, just publish internal channels */
+	if (!sum_data_len) {
+		indio_dev->channels = inv_mpu_channels;
+		indio_dev->num_channels = INV_MPU6050_NUM_INT_CHAN;
+		BUILD_BUG_ON(ARRAY_SIZE(inv_mpu_channels) != INV_MPU6050_NUM_INT_CHAN);
+		return 0;
+	}
+
+	indio_dev->num_channels = INV_MPU6050_NUM_INT_CHAN + num_ext_chan;
+	indio_dev->channels = fnarg.channels = devm_kmalloc(dev,
+			indio_dev->num_channels * sizeof(struct iio_chan_spec),
+			GFP_KERNEL);
+	if (!fnarg.channels)
+		return -ENOMEM;
+	memcpy(fnarg.channels, inv_mpu_channels, sizeof(inv_mpu_channels));
+	memset(fnarg.channels + INV_MPU6050_NUM_INT_CHAN, 0,
+	       num_ext_chan * sizeof(struct iio_chan_spec));
+
+	st->ext_chan = devm_kzalloc(dev, num_ext_chan * sizeof(*st->ext_chan), GFP_KERNEL);
+	if (!st->ext_chan)
+		return -ENOMEM;
+
+	result = inv_mpu6050_set_power_itg(st, true);
+	if (result < 0)
+		return result;
+
+	result = device_for_each_child(&st->aux_master_adapter.dev, &fnarg,
+				       inv_mpu_handle_ext_sensor_fn);
+	if (result)
+		goto out_disable;
+	/* Timestamp channel has index 0 and last scan_index */
+	fnarg.channels[0].scan_index = fnarg.scan_index;
+
+	if (fnarg.chan_index != num_ext_chan) {
+		dev_err(&indio_dev->dev, "Failed to match all external channels!\n");
+		result = -EINVAL;
+		goto out_disable;
+	}
+
+	result = inv_mpu6050_set_power_itg(st, false);
+	return result;
+
+out_disable:
+	inv_mpu6050_set_power_itg(st, false);
+	return result;
+}
 
 /**
  *  inv_check_and_setup_chip() - check and setup chip.
@@ -1139,8 +1514,6 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 		indio_dev->name = name;
 	else
 		indio_dev->name = dev_name(dev);
-	indio_dev->channels = inv_mpu_channels;
-	indio_dev->num_channels = ARRAY_SIZE(inv_mpu_channels);
 
 	indio_dev->info = &mpu_info;
 	indio_dev->modes = INDIO_BUFFER_TRIGGERED;
@@ -1177,6 +1550,12 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 		goto out_remove_trigger;
 	}
 #endif
+
+	result = inv_mpu6050_handle_ext_sensors(indio_dev);
+	if (result < 0) {
+		dev_err(dev, "failed to configure channels %d\n", result);
+		goto out_remove_trigger;
+	}
 
 	INIT_KFIFO(st->timestamps);
 	spin_lock_init(&st->time_stamp_lock);
