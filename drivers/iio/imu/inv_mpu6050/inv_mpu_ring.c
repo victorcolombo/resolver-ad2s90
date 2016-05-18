@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 #include <linux/kfifo.h>
 #include <linux/poll.h>
+#include <linux/spi/spi.h>
 #include "inv_mpu_iio.h"
 
 static void inv_clear_kfifo(struct inv_mpu6050_state *st)
@@ -128,6 +129,13 @@ irqreturn_t inv_mpu6050_read_fifo(int irq, void *p)
 	u16 fifo_count;
 	s64 timestamp;
 
+	struct device *regmap_dev = regmap_get_device(st->map);
+	struct i2c_client *i2c;
+	struct spi_device *spi = NULL;
+
+	i2c = i2c_verify_client(regmap_dev);
+	spi = i2c ? NULL: to_spi_device(regmap_dev);
+
 	mutex_lock(&indio_dev->mlock);
 	if (!(st->chip_config.accl_fifo_enable |
 		st->chip_config.gyro_fifo_enable))
@@ -160,10 +168,27 @@ irqreturn_t inv_mpu6050_read_fifo(int irq, void *p)
 	    fifo_count / bytes_per_datum + INV_MPU6050_TIME_STAMP_TOR)
 		goto flush_fifo;
 	while (fifo_count >= bytes_per_datum) {
-		result = regmap_bulk_read(st->map, st->reg->fifo_r_w,
-					  data, bytes_per_datum);
-		if (result)
-			goto flush_fifo;
+		/*
+		 * We need to do a large burst read from a single register.
+		 *
+		 * regmap_read_bulk assumes that multiple registers are
+		 * involved but in our case st->reg->fifo_r_w + 1 is something
+		 * completely unrelated.
+		 */
+		if (spi) {
+			u8 cmd = st->reg->fifo_r_w | 0x80;
+			result = spi_write_then_read(spi,
+					&cmd, 1,
+					data, bytes_per_datum);
+			if (result)
+				goto flush_fifo;
+		} else {
+			result = i2c_smbus_read_i2c_block_data(i2c,
+					st->reg->fifo_r_w,
+					bytes_per_datum, data);
+			if (result != bytes_per_datum)
+				goto flush_fifo;
+		}
 
 		result = kfifo_out(&st->timestamps, &timestamp, 1);
 		/* when there is no timestamp, put timestamp as 0 */
