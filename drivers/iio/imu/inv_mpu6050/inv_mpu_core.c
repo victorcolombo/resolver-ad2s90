@@ -115,6 +115,53 @@ static const struct inv_mpu6050_hw hw_info[] = {
 	},
 };
 
+static bool inv_mpu6050_volatile_reg(struct device *dev, unsigned int reg)
+{
+	if (reg >= INV_MPU6050_REG_RAW_ACCEL && reg < INV_MPU6050_REG_RAW_ACCEL + 6)
+		return true;
+	if (reg >= INV_MPU6050_REG_RAW_GYRO && reg < INV_MPU6050_REG_RAW_GYRO + 6)
+		return true;
+	switch (reg) {
+	case INV_MPU6050_REG_TEMPERATURE:
+	case INV_MPU6050_REG_TEMPERATURE + 1:
+	case INV_MPU6050_REG_USER_CTRL:
+	case INV_MPU6050_REG_PWR_MGMT_1:
+	case INV_MPU6050_REG_FIFO_COUNT_H:
+	case INV_MPU6050_REG_FIFO_COUNT_H + 1:
+	case INV_MPU6050_REG_FIFO_R_W:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool inv_mpu6050_precious_reg(struct device *dev, unsigned int reg)
+{
+	switch (reg) {
+	case INV_MPU6050_REG_FIFO_R_W:
+		return true;
+	default:
+		return false;
+	}
+}
+
+/*
+ * Common regmap config for inv_mpu devices
+ *
+ * The current volatile/precious registers are common among supported devices.
+ * When that changes the volatile/precious callbacks should go through the
+ * inv_mpu6050_reg_map structs.
+ */
+const struct regmap_config inv_mpu_regmap_config = {
+	.reg_bits = 8,
+	.val_bits = 8,
+
+	.cache_type = REGCACHE_RBTREE,
+	.volatile_reg = inv_mpu6050_volatile_reg,
+	.precious_reg = inv_mpu6050_precious_reg,
+};
+EXPORT_SYMBOL_GPL(inv_mpu_regmap_config);
+
 int inv_mpu6050_switch_engine(struct inv_mpu6050_state *st, bool en, u32 mask)
 {
 	unsigned int d, mgmt_1;

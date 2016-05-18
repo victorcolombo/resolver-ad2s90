@@ -292,3 +292,4 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 int inv_mpu_core_remove(struct device *dev);
 int inv_mpu6050_set_power_itg(struct inv_mpu6050_state *st, bool power_on);
 extern const struct dev_pm_ops inv_mpu_pmops;
+extern const struct regmap_config inv_mpu_regmap_config;
