@@ -69,7 +69,8 @@ static int inv_mpu6050_set_enable(struct iio_dev *indio_dev, bool enable)
 		if (result)
 			return result;
 
-		result = regmap_write(st->map, st->reg->int_enable, 0);
+		result = regmap_update_bits(st->map, st->reg->int_enable,
+					INV_MPU6050_BIT_DATA_RDY_EN, 0);
 		if (result)
 			return result;
 

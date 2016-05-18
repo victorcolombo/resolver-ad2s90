@@ -41,7 +41,8 @@ int inv_reset_fifo(struct iio_dev *indio_dev)
 	struct inv_mpu6050_state  *st = iio_priv(indio_dev);
 
 	/* disable interrupt */
-	result = regmap_write(st->map, st->reg->int_enable, 0);
+	result = regmap_update_bits(st->map, st->reg->int_enable,
+				    INV_MPU6050_BIT_DATA_RDY_EN, 0);
 	if (result) {
 		dev_err(regmap_get_device(st->map), "int_enable failed %d\n",
 			result);
@@ -68,8 +69,9 @@ int inv_reset_fifo(struct iio_dev *indio_dev)
 	/* enable interrupt */
 	if (st->chip_config.accl_fifo_enable ||
 	    st->chip_config.gyro_fifo_enable) {
-		result = regmap_write(st->map, st->reg->int_enable,
-				      INV_MPU6050_BIT_DATA_RDY_EN);
+		result = regmap_update_bits(st->map, st->reg->int_enable,
+					    INV_MPU6050_BIT_DATA_RDY_EN,
+					    INV_MPU6050_BIT_DATA_RDY_EN);
 		if (result)
 			return result;
 	}
@@ -92,8 +94,9 @@ int inv_reset_fifo(struct iio_dev *indio_dev)
 
 reset_fifo_fail:
 	dev_err(regmap_get_device(st->map), "reset fifo failed %d\n", result);
-	result = regmap_write(st->map, st->reg->int_enable,
-			      INV_MPU6050_BIT_DATA_RDY_EN);
+	result = regmap_update_bits(st->map, st->reg->int_enable,
+				    INV_MPU6050_BIT_DATA_RDY_EN,
+				    INV_MPU6050_BIT_DATA_RDY_EN);
 
 	return result;
 }
