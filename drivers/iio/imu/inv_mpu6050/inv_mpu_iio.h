@@ -43,6 +43,7 @@
  *  @int_pin_cfg;	Controls interrupt pin configuration.
  *  @accl_offset:	Controls the accelerometer calibration offset.
  *  @gyro_offset:	Controls the gyroscope calibration offset.
+ *  @mst_status:	secondary I2C master interrupt source status
  */
 struct inv_mpu6050_reg_map {
 	u8 sample_rate_div;
@@ -62,6 +63,7 @@ struct inv_mpu6050_reg_map {
 	u8 int_pin_cfg;
 	u8 accl_offset;
 	u8 gyro_offset;
+	u8 mst_status;
 };
 
 /*device enum */
@@ -140,6 +142,17 @@ struct inv_mpu6050_state {
 	DECLARE_KFIFO(timestamps, long long, TIMESTAMP_FIFO_SIZE);
 	struct regmap *map;
 	int irq;
+
+	/* if the MPU connects to aux devices as a master */
+	bool i2c_aux_master_mode;
+
+#ifdef CONFIG_I2C
+	/* I2C adapter for talking to aux sensors in "master" mode */
+	struct i2c_adapter aux_master_adapter;
+	struct completion slv4_done;
+	/* Value of I2C_MST_STATUS after slv4_done */
+	u8 slv4_done_status;
+#endif
 };
 
 /*register and associated bit definition*/
@@ -155,9 +168,32 @@ struct inv_mpu6050_state {
 #define INV_MPU6050_BIT_ACCEL_OUT           0x08
 #define INV_MPU6050_BITS_GYRO_OUT           0x70
 
+#define INV_MPU6050_REG_I2C_SLV4_ADDR       0x31
+#define INV_MPU6050_BIT_I2C_SLV4_R          0x80
+#define INV_MPU6050_BIT_I2C_SLV4_W          0x00
+
+#define INV_MPU6050_REG_I2C_SLV4_REG        0x32
+#define INV_MPU6050_REG_I2C_SLV4_DO         0x33
+#define INV_MPU6050_REG_I2C_SLV4_CTRL       0x34
+
+#define INV_MPU6050_BIT_SLV4_EN             0x80
+#define INV_MPU6050_BIT_SLV4_INT_EN         0x40
+#define INV_MPU6050_BIT_SLV4_REG_DIS        0x20
+
+#define INV_MPU6050_REG_I2C_SLV4_DI         0x35
+
+#define INV_MPU6050_REG_I2C_MST_STATUS      0x36
+#define INV_MPU6050_BIT_I2C_SLV4_DONE       0x40
+#define INV_MPU6050_BIT_I2C_LOST_ARB        0x20
+#define INV_MPU6050_BIT_I2C_SLV4_NACK       0x10
+
 #define INV_MPU6050_REG_INT_ENABLE          0x38
 #define INV_MPU6050_BIT_DATA_RDY_EN         0x01
 #define INV_MPU6050_BIT_DMP_INT_EN          0x02
+#define INV_MPU6050_BIT_MST_INT_EN          0x08
+
+#define INV_MPU6050_REG_INT_STATUS          0x3A
+#define INV_MPU6050_BIT_MST_INT             0x08
 
 #define INV_MPU6050_REG_RAW_ACCEL           0x3B
 #define INV_MPU6050_REG_TEMPERATURE         0x41
