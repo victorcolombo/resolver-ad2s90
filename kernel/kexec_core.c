@@ -48,29 +48,29 @@
 
 DEFINE_MUTEX(kexec_mutex);
 
-#include "../mach-keystone/memory.h"
-#define IDMAP_ADDR_OFFSET \
-	(KEYSTONE_HIGH_PHYS_START - KEYSTONE_LOW_PHYS_START)
-#define IDMAP_PFN_OFFSET (IDMAP_ADDR_OFFSET >> PAGE_SHIFT)
+//#include "../mach-keystone/memory.h"
+//#define IDMAP_ADDR_OFFSET					\
+//	(KEYSTONE_HIGH_PHYS_START - KEYSTONE_LOW_PHYS_START)
+//#define IDMAP_PFN_OFFSET (IDMAP_ADDR_OFFSET >> PAGE_SHIFT)
 
 static unsigned long page_to_boot_pfn(struct page *page)
 {
-	return page_to_pfn(page) - IDMAP_PFN_OFFSET;
+	return page_to_pfn(page);// - IDMAP_PFN_OFFSET;
 }
 
 static struct page *boot_pfn_to_page(unsigned long boot_pfn)
 {
-	return pfn_to_page(boot_pfn + IDMAP_PFN_OFFSET);
+	return pfn_to_page(boot_pfn);// + IDMAP_PFN_OFFSET);
 }
 
 static unsigned long virt_to_boot_phys(void *addr)
 {
-	return phys_to_idmap(__pa((unsigned long)addr));
+	return 0;//phys_to_idmap(__pa((unsigned long)addr));
 }
 
 static void *boot_phys_to_virt(unsigned long entry)
 {
-	return phys_to_virt(idmap_to_phys(entry));
+	return NULL;//phys_to_virt(idmap_to_phys(entry));
 }
 
 /* Per cpu memory for storing cpu states in case of system crash. */
@@ -252,8 +252,8 @@ int sanity_check_segment_list(struct kimage *image)
 			mstart = image->segment[i].mem;
 			mend = mstart + image->segment[i].memsz - 1;
 			/* Ensure we are within the crash kernel limits */
-			if ((mstart < phys_to_idmap(crashk_res.start)) ||
-			    (mend > phys_to_idmap(crashk_res.end)))
+			//		if ((mstart < phys_to_idmap(crashk_res.start)) ||
+			//		    (mend > phys_to_idmap(crashk_res.end)))
 				return result;
 		}
 	}
