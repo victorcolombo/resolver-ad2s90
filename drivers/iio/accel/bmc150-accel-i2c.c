@@ -31,6 +31,10 @@
 static int bmc150_accel_probe(struct i2c_client *client,
 			      const struct i2c_device_id *id)
 {
+	int ret;
+	struct acpi_device *adev;
+	struct i2c_board_info board_info;
+	struct i2c_client *second_dev;
 	struct regmap *regmap;
 	const char *name = NULL;
 	bool block_supported =
@@ -47,12 +51,35 @@ static int bmc150_accel_probe(struct i2c_client *client,
 	if (id)
 		name = id->name;
 
-	return bmc150_accel_core_probe(&client->dev, regmap, client->irq, name,
+	ret = bmc150_accel_core_probe(&client->dev, regmap, client->irq, name,
 				       block_supported);
+	if (ret)
+		return ret;
+
+	/*
+	 * Some BOSC0200 acpi_devices describe 2 accelerometers in a single ACPI
+	 * device, try instantiating a second i2c_client for an I2cSerialBusV2
+	 * ACPI resource with index 1.
+	 */
+	adev = ACPI_COMPANION(&client->dev);
+	if (adev && strcmp(acpi_device_hid(adev), "BOSC0200") == 0) {
+		memset(&board_info, 0, sizeof(board_info));
+		strlcpy(board_info.type, "bma250e", I2C_NAME_SIZE);
+		second_dev = i2c_acpi_new_device(&client->dev, 1, &board_info);
+		if (second_dev)
+			bmc150_set_second_device(second_dev);
+	}
+
+	return ret;
 }
 
 static int bmc150_accel_remove(struct i2c_client *client)
 {
+	struct i2c_client *second_dev = bmc150_get_second_device(client);
+
+	if (second_dev)
+		i2c_unregister_device(second_dev);
+
 	return bmc150_accel_core_remove(&client->dev);
 }
 
