@@ -143,7 +143,8 @@ config ASPEED_ADC
 
 config AT91_ADC
 	tristate "Atmel AT91 ADC"
-	depends on ARCH_AT91
+	depends on ARCH_AT91 || COMPILE_TEST
+	depends on HAS_IOMEM
 	depends on INPUT && SYSFS
 	select IIO_BUFFER
 	select IIO_TRIGGERED_BUFFER
@@ -201,7 +202,7 @@ config BCM_IPROC_ADC
 
 config BERLIN2_ADC
 	tristate "Marvell Berlin2 ADC driver"
-	depends on ARCH_BERLIN
+	depends on ARCH_BERLIN || COMPILE_TEST
 	help
 	  Marvell Berlin2 ADC driver. This ADC has 8 channels, with one used for
 	  temperature measurement.
@@ -263,7 +264,8 @@ config ENVELOPE_DETECTOR
 
 config EP93XX_ADC
 	tristate "Cirrus Logic EP93XX ADC driver"
-	depends on ARCH_EP93XX
+	depends on ARCH_EP93XX || COMPILE_TEST
+	depends on HAS_IOMEM
 	help
 	  Driver for the ADC module on the EP93XX series of SoC from Cirrus Logic.
 	  It's recommended to switch on CONFIG_HIGH_RES_TIMERS option, in this
@@ -676,7 +678,8 @@ config STX104
 config SUN4I_GPADC
 	tristate "Support for the Allwinner SoCs GPADC"
 	depends on IIO
-	depends on MFD_SUN4I_GPADC || MACH_SUN8I
+	depends on MFD_SUN4I_GPADC || MACH_SUN8I || COMPILE_TEST
+	depends on HAS_IOMEM
 	depends on THERMAL || !THERMAL_OF
 	help
 	  Say yes here to build support for Allwinner (A10, A13 and A31) SoCs
